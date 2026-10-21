@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  scm-time-machine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: scm-time-machine:latest
+    container_name: scm-time-machine
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - DATABASE_PATH=/app/server/data/scm_metadata.sqlite
+      - FOSSIL_PATH=/usr/bin/fossil
+      - FOSSIL_DATA_DIR=/app/server/data
+      - JENKINS_URL=http://jenkins:8080
+      - DOCKER_CONTAINER=true
+    volumes:
+      # Persistent named volume ensures Fossil repositories (.fossil)
+      # and SQLite database metadata survive container restarts
+      - scm_fossil_data:/app/server/data
+
+volumes:
+  scm_fossil_data:
+    driver: local

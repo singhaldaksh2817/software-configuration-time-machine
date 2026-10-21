@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.git
+.fslckout
+_FOSSIL_
+*.fossil
+data/
+server/data/
+dist
+.env
+.DS_Store

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & credentials
+.env
+.env.*
+!.env.example
+*.env
+
+# Build outputs
+dist/
+client/dist/
+build/
+
+# Runtime SQLite metadata & Fossil repositories/workspaces
+server/data/*.sqlite
+server/data/*.sqlite-journal
+server/data/*.sqlite-wal
+server/data/*.sqlite-shm
+server/data/repositories/*
+!server/data/repositories/.gitkeep
+server/data/workspaces/*
+!server/data/workspaces/.gitkeep
+
+# Fossil internal files & lockouts
+_FOSSIL_
+.fslckout
+*.fossil-journal
+
+# Logs
+logs/
+*.log
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
