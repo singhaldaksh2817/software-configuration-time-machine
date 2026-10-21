@@ -89,7 +89,25 @@ export default function ProjectDetail() {
 
   const [isComplianceModalOpen, setIsComplianceModalOpen] = useState(false);
   const [healingDrift, setHealingDrift] = useState(false);
+  const [scanningDrift, setScanningDrift] = useState(false);
   const [jenkinsTriggering, setJenkinsTriggering] = useState(false);
+
+  const handleScanDrift = async () => {
+    try {
+      setScanningDrift(true);
+      const res = await api.getDrift(id);
+      setDriftReport(res);
+      if (res?.status === 'DRIFT_DETECTED') {
+        addToast(`Drift scan complete: ${res.summary.driftCount} configuration item(s) drifted from baseline!`, 'warning', '⚠ Drift Detected');
+      } else {
+        addToast('Drift scan complete: All items strictly match baseline.', 'success', '✔ In Sync');
+      }
+    } catch (err) {
+      addToast(err.message, 'error', 'Drift Scan Failed');
+    } finally {
+      setScanningDrift(false);
+    }
+  };
 
   const handleAutoHeal = async () => {
     try {
@@ -221,6 +239,7 @@ export default function ProjectDetail() {
     { id: 'configurations', label: 'Configurations', icon: FileCode2, count: configurations.length },
     { id: 'timeline', label: 'Timeline', icon: Clock, count: timeline.length },
     { id: 'baselines', label: 'Baselines', icon: BookmarkCheck, count: baselines.length },
+    { id: 'drift', label: 'Drift Detection', icon: AlertTriangle, count: driftReport?.summary?.driftCount || 0 },
     { id: 'changes', label: 'Changes', icon: GitPullRequest, count: changes.length },
     { id: 'compare', label: 'Compare', icon: GitCompare },
     { id: 'rollback', label: 'Rollback', icon: RotateCcw },
@@ -420,15 +439,21 @@ export default function ProjectDetail() {
 
               <div className="flex items-center gap-2">
                 <button
+                  onClick={handleScanDrift}
+                  disabled={scanningDrift}
+                  className="px-3 py-1.5 rounded-lg bg-archival-surface hover:bg-archival-elevated border border-archival-border text-xs font-mono text-archival-text transition-colors flex items-center gap-1.5"
+                  title="Scan workspace against baseline for configuration drift"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-archival-teal ${scanningDrift ? 'animate-spin' : ''}`} />
+                  <span>{scanningDrift ? 'Scanning...' : 'Scan Drift'}</span>
+                </button>
+                <button
                   onClick={() => {
-                    setTab('compare');
-                    setCompareMode('baseline_vs_current');
-                    setCompareRefA(driftReport.baseline.code);
-                    handleRunCompare(driftReport.baseline.code, null, 'baseline_vs_current');
+                    setTab('drift');
                   }}
                   className="px-3 py-1.5 rounded-lg bg-archival-elevated hover:bg-archival-border border border-archival-border text-xs font-mono text-archival-text transition-colors"
                 >
-                  Inspect Drift Diff
+                  View Drift Report
                 </button>
                 {driftReport.status === 'DRIFT_DETECTED' && (
                   <>
@@ -733,6 +758,240 @@ export default function ProjectDetail() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* TAB: DRIFT DETECTION RESULT */}
+      {activeTab === 'drift' && (
+        <div className="space-y-6">
+          {/* Header & Scan Controls */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-xl bg-archival-surface border border-archival-border shadow-sm">
+            <div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-archival-warning" />
+                <h2 className="text-base font-bold text-archival-text">
+                  Configuration Drift Detection Result
+                </h2>
+              </div>
+              <p className="text-xs text-archival-muted mt-1">
+                Automated detection of deviations between active configuration items and the approved baseline
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={handleScanDrift}
+                disabled={scanningDrift}
+                className="px-3.5 py-2 rounded-lg bg-archival-teal hover:bg-archival-teal/80 text-archival-bg font-bold text-xs transition-colors flex items-center gap-2 shadow-sm shadow-archival-teal/20"
+                title="Run immediate drift scan comparing workspace to baseline"
+              >
+                <RefreshCw className={`w-4 h-4 ${scanningDrift ? 'animate-spin' : ''}`} />
+                <span>{scanningDrift ? 'Scanning Drift...' : 'Scan / Detect Drift'}</span>
+              </button>
+
+              {driftReport?.status === 'DRIFT_DETECTED' && (
+                <button
+                  onClick={handleAutoHeal}
+                  disabled={healingDrift}
+                  className="px-3.5 py-2 rounded-lg bg-archival-warning hover:bg-archival-warning/80 text-archival-bg font-bold text-xs transition-colors flex items-center gap-2 shadow-sm"
+                  title="Automatically revert all drifted configuration files back to baseline"
+                >
+                  <Sparkles className={`w-4 h-4 ${healingDrift ? 'animate-spin' : ''}`} />
+                  <span>{healingDrift ? 'Auto-Healing...' : '⚡ Auto-Heal to Baseline'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Baseline Reference & KPI Cards */}
+          {driftReport?.hasBaseline ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-archival-surface border border-archival-border">
+                <span className="text-[10px] font-mono uppercase text-archival-muted tracking-wider">Active Baseline</span>
+                <div className="text-sm font-bold font-mono text-archival-teal mt-1">
+                  {driftReport.baseline.code}
+                </div>
+                <div className="text-[11px] text-archival-muted truncate mt-0.5">
+                  {driftReport.baseline.name}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-archival-surface border border-archival-border">
+                <span className="text-[10px] font-mono uppercase text-archival-muted tracking-wider">Tracked Items</span>
+                <div className="text-lg font-bold font-mono text-archival-text mt-1">
+                  {driftReport.summary?.total || 0}
+                </div>
+                <div className="text-[11px] text-archival-muted mt-0.5">
+                  Total monitored items
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-archival-surface border border-archival-border">
+                <span className="text-[10px] font-mono uppercase text-archival-muted tracking-wider">Drifted Items</span>
+                <div className={`text-lg font-bold font-mono mt-1 ${
+                  driftReport.summary?.driftCount > 0 ? 'text-archival-warning' : 'text-archival-teal'
+                }`}>
+                  {driftReport.summary?.driftCount || 0}
+                </div>
+                <div className="text-[11px] text-archival-muted mt-0.5">
+                  {driftReport.summary?.driftCount > 0 ? 'Deviations from baseline' : 'All items in sync'}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-archival-surface border border-archival-border">
+                <span className="text-[10px] font-mono uppercase text-archival-muted tracking-wider">Integrity Status</span>
+                <div className="mt-1">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono font-bold border ${
+                    driftReport.status === 'DRIFT_DETECTED'
+                      ? 'bg-archival-warning/15 border-archival-warning/50 text-archival-warning'
+                      : 'bg-archival-teal/15 border-archival-teal/50 text-archival-teal'
+                  }`}>
+                    {driftReport.status === 'DRIFT_DETECTED' ? (
+                      <>
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span>DRIFT DETECTED</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>BASELINE IN SYNC</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                <div className="text-[11px] text-archival-muted mt-1">
+                  Revision: {driftReport.baseline.revision?.substring(0, 8)}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 rounded-xl bg-archival-surface border border-archival-border text-center">
+              <p className="text-xs text-archival-muted">No baseline defined yet. Create a baseline to enable automated drift detection.</p>
+            </div>
+          )}
+
+          {/* Drift Result Details */}
+          {driftReport?.hasBaseline && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-archival-muted">
+                  Configuration Items Audit Breakdown
+                </h3>
+                <span className="text-[11px] text-archival-muted font-mono">
+                  {driftReport.summary?.unchanged || 0} unchanged · {driftReport.summary?.modified || 0} modified · {driftReport.summary?.added || 0} added
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {driftReport.items?.map(item => {
+                  const isModified = item.status === 'MODIFIED';
+                  const isDeleted = item.status === 'DELETED';
+                  const isAdded = item.status === 'ADDED';
+                  const isUnchanged = item.status === 'UNCHANGED';
+
+                  return (
+                    <div
+                      key={item.id || item.path}
+                      className={`p-4 rounded-xl border transition-colors ${
+                        isModified
+                          ? 'bg-archival-warning/10 border-archival-warning/40'
+                          : isDeleted
+                          ? 'bg-archival-danger/10 border-archival-danger/40'
+                          : isAdded
+                          ? 'bg-archival-accent/10 border-archival-accent/40'
+                          : 'bg-archival-surface border-archival-border'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            isModified ? 'bg-archival-warning/20 text-archival-warning' :
+                            isDeleted ? 'bg-archival-danger/20 text-archival-danger' :
+                            isAdded ? 'bg-archival-accent/20 text-archival-accent' :
+                            'bg-archival-elevated text-archival-muted'
+                          }`}>
+                            <FileCode2 className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-archival-text">
+                                {item.path}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                                isModified ? 'bg-archival-warning/20 text-archival-warning border border-archival-warning/40' :
+                                isDeleted ? 'bg-archival-danger/20 text-archival-danger border border-archival-danger/40' :
+                                isAdded ? 'bg-archival-accent/20 text-archival-accent border border-archival-accent/40' :
+                                'bg-archival-teal/15 text-archival-teal border border-archival-teal/30'
+                              }`}>
+                                {item.status}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-archival-muted mt-0.5">
+                              {item.message}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isModified && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                setTab('compare');
+                                setCompareMode('baseline_vs_current');
+                                setCompareRefA(driftReport.baseline.code);
+                                handleRunCompare(driftReport.baseline.code, null, 'baseline_vs_current');
+                              }}
+                              className="px-2.5 py-1 rounded bg-archival-elevated hover:bg-archival-border border border-archival-border text-[11px] font-mono text-archival-text transition-colors"
+                            >
+                              Inspect Full Diff
+                            </button>
+                            <button
+                              onClick={handleAutoHeal}
+                              disabled={healingDrift}
+                              className="px-2.5 py-1 rounded bg-archival-teal hover:bg-archival-teal/80 text-archival-bg font-bold text-[11px] transition-colors flex items-center gap-1 shadow-sm"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              <span>Revert to Baseline</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Inline Diff Preview for Modified Configuration Items */}
+                      {isModified && (item.diff?.hunks || item.diff?.chunks) && (
+                        <div className="mt-3 p-3 rounded-lg bg-archival-bg border border-archival-border/80 font-mono text-xs overflow-x-auto">
+                          <div className="text-[10px] uppercase text-archival-muted mb-1.5 pb-1 border-b border-archival-border/50">
+                            Drift Difference vs Baseline [{driftReport.baseline.code}]
+                          </div>
+                          {(item.diff.hunks || item.diff.chunks || []).map((hunk, cIdx) => (
+                            <div key={cIdx} className="space-y-0.5">
+                              {hunk.lines?.map((line, lIdx) => (
+                                <div
+                                  key={lIdx}
+                                  className={`px-2 py-0.5 rounded text-[11px] flex items-center gap-2 ${
+                                    line.type === 'add'
+                                      ? 'bg-archival-teal/15 text-archival-teal'
+                                      : line.type === 'del'
+                                      ? 'bg-archival-danger/15 text-archival-danger'
+                                      : 'text-archival-muted'
+                                  }`}
+                                >
+                                  <span className="w-3 select-none text-[10px] font-bold">
+                                    {line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}
+                                  </span>
+                                  <span>{line.content}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

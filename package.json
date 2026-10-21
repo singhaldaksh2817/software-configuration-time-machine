@@ -1,0 +1,11 @@
+{
+  "name": "software-configuration-time-machine",
+  "version": "1.0.0",
+  "description": "Software Configuration Time Machine - SCM Platform using Fossil SCM, Node.js, React, Jenkins, and Docker",
+  "private": true,
+  "scripts": {
+    "test": "npm --prefix server test",
+    "server": "npm --prefix server dev",
+    "client": "npm --prefix client dev"
+  }
+}
